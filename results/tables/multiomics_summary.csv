@@ -1,0 +1,4 @@
+"Layer","Samples","Features","Key_Finding"
+"mRNA Expression",1105,25981,"6,768 DEGs (Tumor vs Normal); LASSO 89.4% subtype accuracy"
+"miRNA Expression",1207,1881,"228 miRNA-mRNA pairs (|r|>0.3); 100 regulatory pairs (|r|>0.4)"
+"Somatic Mutation",990,15413,"Top mutated: PIK3CA (369 variants)"

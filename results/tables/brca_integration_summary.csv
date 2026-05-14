@@ -1,0 +1,4 @@
+"Omics_Layer","N_Samples","N_Patients_Unique","Data_Type","Dimensions"
+"mRNA",1094,1094,"RNA-seq TPM","25981 genes x 1105 samples"
+"miRNA",1079,1079,"miRNA-seq read_count","1881 miRNAs x 1207 samples"
+"Both",1076,1076,"Aligned multi-omics","mRNA:25981x1076 + miRNA:1881x1076"

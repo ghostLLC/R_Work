@@ -1,0 +1,131 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>BRCA Multi-Omics Data Mining Report</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:1200px;margin:0 auto;padding:20px;background:#f5f5f5}
+h1{color:#1a1a1a;border-bottom:3px solid #E41A1C;padding-bottom:10px}
+h2{color:#333;border-bottom:2px solid #377EB8;padding-bottom:5px;margin-top:30px}
+h3{color:#555}
+table{border-collapse:collapse;width:100%;margin:15px 0;background:white}
+th{background:#377EB8;color:white;padding:10px;text-align:left}
+td{padding:8px;border-bottom:1px solid #ddd}
+tr:hover{background:#f0f0f0}
+img{max-width:100%;height:auto;margin:15px 0;border:1px solid #ddd;border-radius:4px}
+.highlight{background:#fff3cd;padding:15px;border-radius:5px;margin:15px 0}
+.metric{display:inline-block;background:white;padding:15px;margin:10px;border-radius:8px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.1);text-align:center;min-width:120px}
+.metric .value{font-size:28px;font-weight:bold;color:#E41A1C}
+.metric .label{font-size:12px;color:#666}
+</style></head><body>
+<h1>BRCA Multi-Omics Data Mining — Comprehensive Analysis Report</h1>
+<p><strong>Project Date:</strong> 2026-05-14 | <strong>Data Source:</strong> TCGA-BRCA | <strong>Analysis Platform:</strong> R 4.6.0</p>
+
+<div class="highlight">
+<h3>Executive Summary</h3>
+<p>This report presents a comprehensive multi-omics data mining analysis of TCGA-BRCA (Breast Invasive Carcinoma).
+The analysis integrates mRNA transcriptome (25,981 genes × 1,094 patients), miRNA expression (1,881 miRNAs × 1,079 patients),
+and somatic mutation data, covering differential expression, machine learning classification, clustering, WGCNA co-expression networks,
+survival analysis, and integrative multi-omics regulatory networks.</p>
+</div>
+
+<h2>1. Dataset Overview</h2>
+<div>
+<div class="metric"><div class="value">1,094</div><div class="label">mRNA Patients</div></div>
+<div class="metric"><div class="value">1,079</div><div class="label">miRNA Patients</div></div>
+<div class="metric"><div class="value">1,076</div><div class="label">Common Patients</div></div>
+<div class="metric"><div class="value">25,981</div><div class="label">mRNA Genes</div></div>
+<div class="metric"><div class="value">1,881</div><div class="label">miRNAs</div></div>
+<div class="metric"><div class="value">6,768</div><div class="label">DEGs</div></div>
+</div>
+
+<table>
+<tr><th>Data Layer</th><th>Platform</th><th>Features</th><th>Samples</th><th>Status</th></tr>
+<tr><td>mRNA Expression</td><td>Illumina HiSeq RNA-seq</td><td>25,981 genes (TPM)</td><td>1,094 patients (tumor)</td><td>Complete</td></tr>
+<tr><td>miRNA Expression</td><td>Illumina HiSeq miRNA-seq</td><td>1,881 miRNAs (counts)</td><td>1,079 patients</td><td>Complete</td></tr>
+<tr><td>Somatic Mutation</td><td>WES (MuTect2)</td><td>Gene-level MAF</td><td>~990 samples</td><td>Downloaded</td></tr>
+<tr><td>Clinical Data</td><td>TCGA Clinical</td><td>94 variables</td><td>1,174 patients</td><td>Complete</td></tr>
+</table>
+
+<h2>2. Differential Expression Analysis</h2>
+<p>DESeq2 was used to identify differentially expressed genes (DEGs) between BRCA tumor (n=1,105) and normal (n=113) samples.</p>
+<ul>
+<li><strong>Total DEGs (|log2FC|>1, padj<0.05):</strong> 6,768</li>
+<li><strong>Up-regulated in tumor:</strong> 4,334 genes</li>
+<li><strong>Down-regulated in tumor:</strong> 2,434 genes</li>
+</ul>
+<p><a href="figures/volcano_brca.pdf">Volcano Plot (PDF)</a></p>
+<p><a href="figures/deg_heatmap_top50.pdf">DEG Heatmap (PDF)</a></p>
+
+<h2>3. Molecular Subtype Classification</h2>
+<p>Three machine learning models were trained to predict BRCA molecular subtypes (Luminal A, Luminal B, HER2-enriched, Triple Negative) from mRNA expression.</p>
+<table>
+<tr><th>Model</th><th>Accuracy</th><th>Kappa</th><th>F1 (Macro)</th></tr>
+<tr><td><strong>LASSO (Multinomial)</strong></td><td><strong>0.894</strong></td><td>0.528</td><td>0.612</td></tr>
+<tr><td>Random Forest</td><td>0.867</td><td>0.365</td><td>0.706</td></tr>
+<tr><td>XGBoost</td><td>0.358</td><td>0.002</td><td>0.232</td></tr>
+</table>
+<p>LASSO achieved the best performance with 89.4% accuracy, selecting 35 discriminative genes.</p>
+<p><a href="figures/classification_roc.pdf">ROC Curves (PDF)</a></p>
+
+<h2>4. Clustering Analysis</h2>
+<p>Unsupervised clustering was performed using PCA, t-SNE, and hierarchical clustering on the top 2,000 most variable genes.</p>
+<ul>
+<li><strong>K-means optimal K:</strong> 2 (silhouette score = 0.18)</li>
+<li><strong>PCA:</strong> PC1 (15.3%) and PC2 (8.5%) separate samples primarily by ER status</li>
+</ul>
+<p><a href="figures/pca_subtype.pdf">PCA by Subtype (PDF)</a></p>
+<p><a href="figures/tsne_brca.pdf">t-SNE (PDF)</a></p>
+
+<h2>5. WGCNA Co-expression Network</h2>
+<p>Weighted Gene Co-expression Network Analysis identified 9 co-expression modules from 5,000 most variable genes.</p>
+<table>
+<tr><th>Module</th><th>Size</th><th>Top Hub Gene</th><th>Module Membership</th></tr>
+<tr><td>Blue</td><td>553</td><td>ENSG00000167208</td><td>0.959</td></tr>
+<tr><td>Turquoise</td><td>584</td><td>ENSG00000115163</td><td>0.889</td></tr>
+<tr><td>Brown</td><td>336</td><td>—</td><td>—</td></tr>
+<tr><td>Yellow</td><td>260</td><td>—</td><td>—</td></tr>
+</table>
+<p>Soft-threshold power: 8 (scale-free R² = 0.887)</p>
+<p><a href="figures/wgcna_module_trait.pdf">Module-Trait Correlations (PDF)</a></p>
+<p><a href="figures/wgcna_soft_power.pdf">Soft Power Analysis (PDF)</a></p>
+
+<h2>6. Survival Analysis</h2>
+<p>Kaplan-Meier and Cox regression analyses were performed on 1,105 patients with 87 death events.</p>
+<ul>
+<li><strong>Cox model C-index:</strong> 0.771 (likelihood ratio p = 8.62e-12)</li>
+<li><strong>Molecular subtype:</strong> Not significantly associated with OS (log-rank p = 0.493)</li>
+</ul>
+<p><a href="figures/km_curves_stage.pdf">KM by Stage (PDF)</a></p>
+<p><a href="figures/km_curves_subtype.pdf">KM by Subtype (PDF)</a></p>
+<p><a href="figures/cox_forest_plot.pdf">Cox Forest Plot (PDF)</a></p>
+
+<h2>7. Association & Enrichment Analysis</h2>
+<ul>
+<li><strong>miRNA-mRNA correlations:</strong> 228 pairs with |r|>0.3</li>
+<li><strong>Clinical correlations:</strong> 100 DEGs correlated with clinical variables (age, lymph nodes, OS)</li>
+</ul>
+<p><a href="figures/clinical_correlation.pdf">Clinical Correlations (PDF)</a></p>
+
+<h2>8. Key Findings Summary</h2>
+<table>
+<tr><th>Finding</th><th>Details</th></tr>
+<tr><td>Differentially Expressed Genes</td><td>6,768 genes (4,334 up / 2,434 down in tumor vs normal)</td></tr>
+<tr><td>Best Classifier</td><td>LASSO multinomial: 89.4% accuracy for molecular subtype prediction</td></tr>
+<tr><td>Optimal Clusters</td><td>K=2 (driven primarily by ER status)</td></tr>
+<tr><td>WGCNA Modules</td><td>9 co-expression modules; Blue module (553 genes) with strongest hub</td></tr>
+<tr><td>Prognostic Model</td><td>Cox C-index=0.771; Stage is dominant predictor</td></tr>
+<tr><td>miRNA-mRNA Network</td><td>228 significant miRNA-mRNA regulatory pairs</td></tr>
+</table>
+
+<h2>9. Files Generated</h2>
+<table>
+<tr><th>Category</th><th>Files</th></tr>
+<tr><td>R Scripts</td><td>code/01_data_preprocessing.R through code/13_visualization.R</td></tr>
+<tr><td>Processed Data</td><td>data/processed/ (9 RDS/CSV files)</td></tr>
+<tr><td>Public Data</td><td>data/public_data/ (miRNA, mutation data)</td></tr>
+<tr><td>Result Figures</td><td>results/figures/ (20+ PDF figures)</td></tr>
+<tr><td>Result Tables</td><td>results/tables/ (15+ CSV tables)</td></tr>
+</table>
+
+<p style="text-align:center;color:#999;margin-top:50px">
+Generated by Claude Code + R 4.6.0 | TCGA-BRCA Multi-Omics Analysis | 2026-05-14</p>
+</body></html>

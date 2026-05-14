@@ -1,0 +1,29 @@
+# Data files (too large / private)
+data/private_data/
+data/processed/
+data/public_data/
+
+# GDC download cache
+GDCdata/
+
+# Temp download artifacts
+*.tar.gz
+MANIFEST.txt
+
+# R temporary files
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# OMC state
+.omc/state/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep directory structures
+!data/private_data/.gitkeep
+!data/processed/.gitkeep
+!data/public_data/.gitkeep

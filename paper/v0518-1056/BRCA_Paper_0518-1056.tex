@@ -1,0 +1,502 @@
+﻿% ===========================================================================
+% BRCA Multi-Omics Data Mining — Academic Paper
+% Compile: xelatex -> biber -> xelatex -> xelatex
+% ===========================================================================
+\documentclass[12pt,a4paper]{ctexart}
+
+% ---------- Packages ----------
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[labelfont=bf,font=small]{caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny,
+  backgroundcolor=\color{gray!5}
+}
+
+% ---------- Bibliography: GB/T 7714-2015 ----------
+\usepackage[backend=biber,style=gb7714-2015]{biblatex}
+\addbibresource{references.bib}
+
+\graphicspath{{../results/figures_pub/}}
+
+\title{\heiti\zihao{3} 基于多组学数据挖掘的乳腺癌分子特征分析}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+% ==================== 摘要 ====================
+\begin{abstract}
+\noindent
+乳腺癌是全球发病率最高的恶性肿瘤，其分子异质性是精准诊疗面临的核心挑战。本研究基于TCGA-BRCA多组学数据（mRNA转录组25,981个基因、miRNA表达谱1,881个、体细胞突变15,413个基因及临床注释94项），对1,076例多组学共同患者进行了系统性的数据挖掘分析。研究综合运用DESeq2差异表达分析、LASSO和随机森林分类、PCA/t-SNE聚类、WGCNA共表达网络、Cox比例风险回归、maftools突变景观分析、g:Profiler功能富集分析、arules关联规则挖掘及ConsensusClusterPlus共识聚类等算法。主要结果包括：鉴定6,768个显著差异表达基因（$|\log_2\text{FC}|>1$, FDR$<0.05$），其中上调4,334个、下调2,434个；LASSO分类器以89.4\%准确率实现三分类分子亚型预测，仅使用35个基因；WGCNA识别9个共表达模块，blue模块枢纽基因模块隶属度达0.959；Cox模型C-index为0.771，Stage IV风险比达8.74；PIK3CA（37.3\%）和TP53（35.2\%）为最高频突变基因；功能富集揭示上调基因显著富集于细胞周期通路。本研究为乳腺癌多组学数据挖掘提供了完整分析框架。
+
+\vspace{1em}
+\noindent\textbf{关键词}：乳腺癌；TCGA；多组学数据挖掘；差异表达分析；WGCNA；预后模型
+\end{abstract}
+
+\newpage
+
+% ==================== 1 引言 ====================
+\section{引言}
+
+\subsection{研究背景}
+
+据国际癌症研究机构（IARC）GLOBOCAN 2022统计，全球每年新发癌症约2,000万例，死亡约970万例\cite{sung2024global}。其中女性乳腺癌以约230万例新发病例居全球恶性肿瘤发病率首位，同年导致约67万例死亡。在中国，乳腺癌的发病率和死亡率持续上升，且发病年龄显著早于欧美国家。
+
+乳腺癌的发生发展涉及多基因突变累积、表观遗传重塑及信号通路交互失调等复杂的分子过程\cite{hanahan2011hallmarks}。传统单一维度研究方法难以全面揭示乳腺癌的系统性分子特征。高通量测序技术的快速发展使大规模癌症基因组数据的积累成为可能，以癌症基因组图谱（The Cancer Genome Atlas, TCGA）为代表的国际大型合作项目提供了涵盖多组学的海量公开数据资源\cite{tcga2012comprehensive}。在此背景下，数据挖掘技术为从高维度组学数据中提取具有生物学和临床价值的信息提供了方法论支撑。
+
+\subsection{乳腺癌分子分型}
+
+乳腺癌是由多种分子特征各异的亚型构成的异质性疾病集合。Perou等\cite{perou2000molecular}于2000年首次提出乳腺癌分子分型体系，目前广泛认可的固有分子亚型包括四类：Luminal A型（50\%--60\%，ER+/PR+/HER2-/Ki-67低表达），Luminal B型（15\%--20\%），HER2过表达型（10\%--15\%），三阴性型（15\%--20\%）。尽管该体系已广泛用于临床，同一亚型内部的生物学异质性仍然显著，整合多组学数据进一步挖掘分子分型的内在结构具有重要的研究价值。
+
+\subsection{数据挖掘在癌症研究中的应用}
+
+在差异表达分析方面，DESeq2\cite{love2014moderated}基于负二项分布对RNA-seq计数数据建模。在网络分析层面，WGCNA\cite{langfelder2008wgcna}通过构建无标度拓扑网络将基因聚类为共表达模块。LASSO-Cox\cite{simon2011regularization}能有效应对高维数据中的维数灾难。g:Profiler\cite{kolberg2023gprofiler}提供了一站式多数据库功能富集分析。Apriori算法\cite{agrawal1994fast}可从离散化数据中挖掘关联规则。共识聚类\cite{wilkerson2010consensus}通过重采样评估聚类稳定性。
+
+\subsection{研究目的与论文结构}
+
+本研究以TCGA-BRCA多组学数据为对象，综合运用多种数据挖掘方法，系统分析乳腺癌的分子特征。论文结构如下：第2章介绍材料与方法；第3章呈现分析结果；第4章为讨论；第5章给出结论；附录提供核心R代码。
+
+% ==================== 2 材料与方法 ====================
+\section{材料与方法}
+
+\subsection{数据来源}
+
+本研究数据来源于TCGA-BRCA队列。所有数据通过TCGAbiolinks R包\cite{colaprico2016tcgabiolinks}从GDC API获取（GDC Data Release 42.0），涵盖四个数据层：
+（1）mRNA转录组（HiSeq RNA-seq, STAR-Counts流程）：原始计数矩阵包含60,660个基因；
+（2）miRNA转录组（HiSeq miRNA-seq, BCGSC miRNA Profiling）：1,881个miRNA；
+（3）体细胞突变（WES, MuTect2流程）：MAF格式突变注释文件；
+（4）临床信息：94个原始变量。
+
+\subsection{数据预处理}
+
+\textbf{mRNA数据预处理}：低表达过滤标准为至少在10\%样本中counts $\geq$ 10，保留25,981个基因（42.8\%）。采用TPM（Transcripts Per Million）归一化：$\text{TPM}_{ij} = \frac{X_{ij} / \sum_g X_{gj} \times 10^6}{L_i}$，其中$X_{ij}$为基因$i$在样本$j$中的计数，$L_i$为基因有效长度（千碱基）。基因标识符通过org.Hs.eg.db建立Ensembl ID到Gene Symbol的映射。临床数据从94个原始变量中提取25个核心变量。分子亚型根据ER/PR/HER2免疫组化状态分类。缺失值处理：数值型采用中位数填补，分类型采用众数填补。
+
+\textbf{miRNA与突变数据预处理}：miRNA数据（1,881个miRNA）全部保留。突变数据采用MuTect2流程输出的Masked Somatic Mutation，经maftools\cite{mayakonda2018maftools}加载和质控。
+
+\textbf{多组学整合}：提取各数据层样本条形码前12个字符作为患者ID，取交集确定核心患者队列。最终整合队列为1,076例患者，均具备mRNA和miRNA表达谱及临床注释。
+
+\subsection{分析方法}
+
+\textbf{差异表达分析}：采用DESeq2\cite{love2014moderated}进行肿瘤组织（$n=1,105$）与正常组织（$n=113$）的差异表达分析，显著性阈值取FDR $< 0.05$（Benjamini-Hochberg校正）且$|\log_2\text{FC}| > 1$。同时对三阴性（TN, $n=115$）与Luminal A（$n=950$）进行亚型间差异表达分析。
+
+\textbf{功能富集分析}：采用g:Profiler在线API（gprofiler2 R包）\cite{kolberg2023gprofiler}，覆盖GO:BP、GO:MF、GO:CC、KEGG、Reactome和WikiPathway六个数据库（FDR $< 0.05$，排除IEA电子注释）。
+
+\textbf{分子亚型分类}：比较LASSO多分类回归（5折交叉验证，$\alpha=1$）、随机森林（ntree=500）和XGBoost（nrounds=100）三种算法。输入为Top 500可变基因的$\log_2(\text{TPM}+1)$矩阵，按7:3分层划分训练集和测试集。
+
+\textbf{聚类分析}：PCA对Top 2,000可变基因的$\log_2(\text{TPM}+1)$矩阵进行中心化和标准化。t-SNE采用Rtsne包（perplexity=30）。K-means评估$K=2$--10的轮廓系数。共识聚类\cite{wilkerson2010consensus}采用80\%重采样和1,000次迭代评估聚类稳定性。
+
+\textbf{WGCNA分析}\cite{langfelder2008wgcna}：使用Top 5,000可变基因，signed网络，软阈值选择标准为scale-free $R^2 > 0.8$。minModuleSize=30，mergeCutHeight=0.25。枢纽基因通过模块内连接度（$|\text{MM}|$）识别。
+
+\textbf{生存分析}：采用Kaplan-Meier曲线（log-rank检验）和Cox比例风险回归。Cox模型纳入年龄、淋巴结阳性数、病理分期和分子亚型。模型评价采用C-index和似然比检验。基于Cox模型构建3年生存列线图（rms包）。
+
+\textbf{突变分析}：采用maftools\cite{mayakonda2018maftools}进行突变概况统计、瀑布图可视化和互斥性检验。TMB（Tumor Mutation Burden）按每兆碱基突变数计算（WES约38 Mb），按分子亚型分组比较。
+
+\textbf{关联规则挖掘}：采用Apriori算法（arules包），将Top 50差异基因表达按中位数离散化为High/Low，与临床特征组合构建事务数据集。参数：最小支持度0.3，最小置信度0.7。miRNA-mRNA调控网络通过Pearson相关矩阵构建（$|r| > 0.4$）。
+
+\subsection{分析环境}
+
+所有分析使用R 4.6.0 + Bioconductor 3.23，在Windows 11环境下执行。主要R包包括DESeq2、gprofiler2、caret、randomForest、glmnet、WGCNA、survival、survminer、rms、maftools、arules、ConsensusClusterPlus、ggplot2、ggsci、pheatmap等。论文图表编译使用MiKTeX 25.12 + XeLaTeX。
+
+% ==================== 3 结果 ====================
+\section{结果}
+
+\subsection{数据概览}
+
+经预处理和跨组学整合，最终分析数据集概况见表\ref{tab:data}。mRNA覆盖1,094例肿瘤（另113例正常），miRNA覆盖1,079例，两者交集1,076例（重叠率98.4\%）。临床特征分布：Luminal A 950例（86.3\%），HER2-enriched 37例（3.4\%），Triple Negative 115例（10.4\%）；Stage II为主（58.9\%）。中位总生存随访约2.7年，死亡事件87例（7.9\%）。
+
+\begin{table}[H]
+\centering
+\caption{多组学数据集总览与临床特征}
+\label{tab:data}
+\begin{tabular}{llll}
+\toprule
+数据层 & 平台 & 特征数 & 样本量 \\
+\midrule
+mRNA表达 & HiSeq RNA-seq & 25,981 genes & 1,094 + 113 normal \\
+miRNA表达 & HiSeq miRNA-seq & 1,881 miRNAs & 1,079 \\
+体细胞突变 & WES (MuTect2) & 15,413 genes & 990 \\
+临床数据 & TCGA Clinical & 25 variables & 1,174 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{差异表达与功能富集}
+
+\subsubsection{Tumor vs Normal 差异表达}
+
+DESeq2分析共鉴定6,768个显著差异表达基因（$|\log_2\text{FC}|>1$, FDR$<0.05$），其中肿瘤上调4,334个、下调2,434个（表\ref{tab:deg}）。火山图（图\ref{fig:volcano}）展示了差异表达基因的全局分布，上调侧红色散点密度明显高于下调侧。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig1_volcano.png}
+\caption{差异表达火山图（Tumor vs Normal）}
+\label{fig:volcano}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{差异表达分析结果}
+\label{tab:deg}
+\begin{tabular}{ll}
+\toprule
+指标 & 数值 \\
+\midrule
+总差异表达基因（$|\log_2\text{FC}|>1$, FDR$<0.05$） & 6,768 \\
+上调基因数（Tumor vs Normal） & 4,334 \\
+下调基因数（Tumor vs Normal） & 2,434 \\
+分析方法 & DESeq2 (Wald test, BH correction) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{亚型间差异表达}
+
+Triple Negative与Luminal A之间共鉴定4,888个显著差异表达基因（$|\log_2\text{FC}|>1$, FDR$<0.05$），其中TN上调2,270个，Luminal A上调2,618个（图\ref{fig:tnla}）。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig17_tn_vs_la_volcano.png}
+\caption{Triple Negative vs Luminal A 差异表达火山图}
+\label{fig:tnla}
+\end{figure}
+
+\subsubsection{功能富集分析}
+
+上调基因共富集到643条显著条目（FDR$<0.05$），集中于Reactome Cell Cycle（187个基因，$p=1.5\times10^{-21}$）、Cell Cycle Mitotic、Nucleosome Assembly和DNA Replication（图\ref{fig:enrich_up}）。下调基因富集到1,414条，集中于ECM organization、Cell adhesion和脂质代谢通路（图\ref{fig:enrich_down}）。表\ref{tab:enrich}汇总了三组基因集的富集统计。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig12_enrichment_up.png}
+\caption{上调基因富集气泡图（Top 25, FDR$<0.05$）}
+\label{fig:enrich_up}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig13_enrichment_down.png}
+\caption{下调基因富集气泡图（Top 25, FDR$<0.05$）}
+\label{fig:enrich_down}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{功能富集分析结果汇总}
+\label{tab:enrich}
+\begin{tabular}{lllll}
+\toprule
+基因集 & 基因数 & 显著条目 & Top通路 & $p$值 \\
+\midrule
+上调 & 4,334 & 643 & Cell Cycle (Reactome) & $1.5\times10^{-21}$ \\
+下调 & 2,434 & 1,414 & ECM Organization (Reactome) & $\sim10^{-15}$ \\
+全部DEGs & 6,768 & 1,280 & Cell Cycle (Reactome) & $\sim10^{-18}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{分子亚型分类}
+
+LASSO以89.4\%准确率（Kappa=0.528）在三种分类器中表现最优，仅使用35个区分性基因（表\ref{tab:class}）。随机森林准确率86.7\%（Kappa=0.365），其Macro F1（0.706）高于LASSO（0.612），说明对少数类样本的平衡性更好。XGBoost准确率仅35.8\%，主要因默认超参数未针对本数据调优（图\ref{fig:model}）。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{fig6_model_comparison.png}
+\caption{分类模型性能对比}
+\label{fig:model}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{分子亚型分类模型性能对比}
+\label{tab:class}
+\begin{tabular}{lllll}
+\toprule
+模型 & Accuracy & Kappa & F1 (Macro) & 特征数 \\
+\midrule
+LASSO (Multinomial) & 0.894 & 0.528 & 0.612 & 35 \\
+Random Forest & 0.867 & 0.365 & 0.706 & 500 \\
+XGBoost & 0.358 & 0.002 & 0.232 & 500 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{聚类分析}
+
+PCA分析显示PC1（15.3\%）和PC2（8.5\%）合计解释了23.8\%方差。散点图上Luminal A形成紧凑簇，Triple Negative最为分散（图\ref{fig:pca}）。K-means轮廓系数在$K=2$时最大（0.18），此后单调下降，支持ER+/ER-二分是BRCA转录组的最强自然分组。t-SNE进一步展示了Luminal A与Triple Negative之间的清晰分离。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig2_pca_subtype.png}
+\caption{PCA主成分分析（PC1 15.3\% $\times$ PC2 8.5\%, NPG四色分子亚型）}
+\label{fig:pca}
+\end{figure}
+
+\subsection{WGCNA共表达网络}
+
+软阈值选择Power=8时scale-free $R^2=0.887$。共识别9个共表达模块（表\ref{tab:wgcna}）。不含grey模块的8个有效模块涵盖2,183个基因。Blue模块（553个基因）枢纽基因ENSG00000167208的$|\text{MM}|=0.959$为最高。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{fig7_wgcna_sft.png}
+\caption{WGCNA软阈值选择（Power=8, $R^2=0.887$）}
+\label{fig:wgcna}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{WGCNA共表达模块}
+\label{tab:wgcna}
+\begin{tabular}{lll}
+\toprule
+模块 & 基因数 & 枢纽基因$|\text{MM}|$ \\
+\midrule
+grey（未分配） & 2,817 & 0.836 \\
+turquoise & 584 & 0.889 \\
+blue & 553 & 0.959 \\
+brown & 336 & 0.911 \\
+yellow & 260 & 0.874 \\
+green & 224 & 0.903 \\
+red & 119 & 0.881 \\
+black & 63 & 0.854 \\
+pink & 44 & 0.847 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{生存分析}
+
+Kaplan-Meier曲线显示病理分期呈显著的逐级分离趋势（log-rank $p<0.0001$，图\ref{fig:km}）。多变量Cox回归确认Stage IV HR=8.74（95\%CI: 3.61--21.14, $p<0.001$），Stage III HR=2.96（$p=0.004$）（表\ref{tab:cox}，图\ref{fig:cox}）。C-index=0.771（$p=8.62\times10^{-12}$）。在控制分期后，分子亚型无显著独立预后价值（所有$p>0.5$）。基于Cox模型的3年生存列线图（图\ref{fig:nomogram}）提供了临床实用的预后评估工具。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig3_km_stage.png}
+\caption{Kaplan-Meier生存曲线（Stage I-IV, $p<0.0001$）}
+\label{fig:km}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig9_cox_forest.png}
+\caption{Cox回归森林图（C-index=0.771）}
+\label{fig:cox}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{多变量Cox回归结果}
+\label{tab:cox}
+\begin{tabular}{llll}
+\toprule
+变量 & HR & 95\% CI & $p$值 \\
+\midrule
+Stage II (vs I) & 1.82 & 0.99--3.35 & 0.054 \\
+Stage III (vs I) & 2.96 & 1.43--6.12 & 0.004 \\
+Stage IV (vs I) & 8.74 & 3.61--21.14 & $<0.001$ \\
+HER2-enriched & 1.21 & 0.62--2.36 & 0.578 \\
+Triple Negative & 1.02 & 0.57--1.82 & 0.947 \\
+\bottomrule
+\multicolumn{4}{l}{C-index=0.771, LR $p=8.62\times10^{-12}$} \\
+\end{tabular}
+\end{table}
+
+\subsection{体细胞突变与TMB}
+
+突变分析涵盖990例样本、15,413个基因、67,546个变异位点。PIK3CA（369例, 37.3\%）和TP53（348例, 35.2\%）为最高频突变基因（图\ref{fig:oncoplot}），两者呈现互斥趋势。TMB分析显示Triple Negative中位TMB（1.47/Mb）显著高于Luminal A（0.79/Mb），约为1.86倍（图\ref{fig:tmb}），与TNBC基因组不稳定性更高的已知特征一致。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig4_oncoplot.png}
+\caption{体细胞突变瀑布图（Top 12基因）}
+\label{fig:oncoplot}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig18_tmb_by_subtype.png}
+\caption{TMB按分子亚型分布}
+\label{fig:tmb}
+\end{figure}
+
+\subsection{关联规则与调控网络}
+
+Apriori算法识别了基因表达状态与临床特征之间的关联规则（图\ref{fig:rules}）。miRNA-mRNA调控网络以$|r|>0.4$为阈值共识别2,065对调控关系对（图\ref{fig:mirna}）。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{fig15_association_rules.png}
+\caption{关联规则散点图}
+\label{fig:rules}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{fig10_mirna_mrna_corr.png}
+\caption{miRNA-mRNA调控相关性热图}
+\label{fig:mirna}
+\end{figure}
+
+% ==================== 4 讨论 ====================
+\section{讨论}
+
+本研究通过系统的多组学数据挖掘，构建了覆盖11种分析方法的BRCA分子特征整合分析管线。以下从几个关键维度对结果进行讨论。
+
+\textbf{差异表达与功能富集}：上调基因集中于细胞周期和DNA复制通路，下调基因集中于ECM组织和细胞黏附通路，这一功能分异与肿瘤的增殖活跃和微环境脱离特征高度吻合。上调基因中Reactome Cell Cycle通路的富集显著性（$p=1.5\times10^{-21}$）远超其他通路，反映出细胞周期失调在BRCA转录组中的核心地位。Triple Negative与Luminal A之间存在4,888个差异表达基因，远多于Tumor vs Normal的差异基因覆盖范围，提示亚型间转录组差异的幅度不低于肿瘤与正常组织的差异。
+
+\textbf{分类与聚类的一致性}：LASSO的高准确率（89.4\%）和低特征数（35个基因）共同验证了乳腺癌分子亚型间转录组差异的稀疏性。聚类分析中PCA、t-SNE和K-means三种独立方法一致指向ER状态为最显著的分组驱动因素，与分类分析中分子亚型的可预测性互为印证。
+
+\textbf{生存预后}：Cox模型在控制分期后分子亚型无独立预后贡献（所有$p>0.5$），这一结果与部分文献的结论一致，也与部分文献的结论存在分歧。可能的原因包括本队列随访时间较短（中位2.7年）、死亡事件有限（87例），以及不同分子亚型患者接受了针对性的标准治疗部分抹平了固有预后差异。列线图的构建为临床个体化预后评估提供了直观工具。
+
+\textbf{突变特征}：PIK3CA和TP53的高频突变以及两者之间的互斥趋势与已知BRCA驱动突变谱高度一致。TMB在Triple Negative中显著高于Luminal A，这可能部分解释了TNBC对免疫检查点抑制剂的较高应答率，因为更高的TMB通常与更多的新抗原产生和增强的抗肿瘤免疫应答相关。
+
+\textbf{局限性}：（1）DNA甲基化数据（Illumina 450K, 11.7 GB）因数据量过大未纳入分析，缺失了表观遗传维度；（2）生存分析事件率较低（7.9\%）限制了预后模型统计功效；（3）miRNA-mRNA调控关系基于统计相关而非因果验证；（4）XGBoost模型未经系统超参数调优。
+
+% ==================== 5 结论 ====================
+\section{结论}
+
+本研究以TCGA-BRCA多组学数据为基础，整合mRNA、miRNA和体细胞突变三个组学层次，构建了覆盖差异表达分析、功能富集、分子亚型分类、聚类分析、WGCNA共表达网络、生存分析、突变分析、关联规则挖掘和miRNA调控网络分析的完整数据挖掘流程。主要结论如下：
+
+（1）DESeq2鉴定6,768个Tumor vs Normal显著差异基因及4,888个TN vs Luminal A差异基因，功能富集揭示上调基因集中于细胞周期通路（$p=1.5\times10^{-21}$），下调基因集中于ECM组织通路。
+
+（2）LASSO以89.4\%准确率仅用35个基因实现三分类分子亚型预测，验证了亚型间转录组差异的稀疏性。
+
+（3）PCA和K-means一致表明ER状态是BRCA转录组的最强驱动因素。
+
+（4）WGCNA识别9个共表达模块，Blue模块枢纽基因MM达0.959。
+
+（5）多变量Cox证实病理分期是BRCA预后最强预测因子（C-index=0.771, Stage IV HR=8.74）。列线图提供了临床实用的预后评估工具。
+
+（6）PIK3CA（37.3\%）和TP53（35.2\%）为最高频突变基因。TN的TMB显著高于Luminal A（1.47 vs 0.79/Mb）。
+
+未来研究可向以下方向推进：纳入DNA甲基化数据实现四组学整合、利用独立验证队列进行外部验证、对WGCNA Blue模块枢纽基因进行功能实验验证、以及探索深度学习方法在多组学数据融合中的应用。
+
+% ==================== 参考文献 ====================
+\printbibliography
+
+% ==================== 附录 ====================
+\newpage
+\appendix
+\section{核心R代码}
+
+以下附录收录本研究中全部关键分析步骤的R代码。
+
+\subsection{数据预处理与差异表达}
+
+\begin{lstlisting}[caption={mRNA数据预处理与DESeq2差异表达}, label={lst:deg}]
+# Load data
+brca <- readRDS("data/processed/brca_tumor_processed.rds")
+counts_tumor <- readRDS("data/processed/brca_tumor_counts.rds")
+counts_normal <- readRDS("data/processed/brca_normal_counts.rds")
+
+# DESeq2
+dds <- DESeqDataSetFromMatrix(
+  countData = cbind(counts_tumor, counts_normal),
+  colData = data.frame(
+    condition = factor(c(rep("Tumor", ncol(counts_tumor)),
+                         rep("Normal", ncol(counts_normal)))),
+  design = ~ condition)
+dds <- DESeq(dds)
+res <- results(dds, contrast = c("condition", "Tumor", "Normal"),
+               alpha = 0.05)
+\end{lstlisting}
+
+\subsection{WGCNA共表达网络}
+
+\begin{lstlisting}[caption={WGCNA共表达网络构建}, label={lst:wgcna}]
+library(WGCNA)
+enableWGCNAThreads(4)
+
+# Select top 5000 variable genes
+log_tpm <- log2(tpm_mat + 1)
+gene_var <- apply(log_tpm, 1, var)
+top5000 <- names(sort(gene_var, decreasing = TRUE))[1:5000]
+datExpr <- t(log_tpm[top5000, ])
+
+# Soft threshold selection
+sft <- pickSoftThreshold(datExpr, powerVector = 1:20,
+                          networkType = "signed")
+
+# Module construction
+net <- blockwiseModules(datExpr, power = sft$powerEstimate,
+  TOMType = "signed", minModuleSize = 30,
+  mergeCutHeight = 0.25, numericLabels = TRUE)
+\end{lstlisting}
+
+\subsection{生存分析与列线图}
+
+\begin{lstlisting}[caption={Cox回归与预后列线图}, label={lst:survival}]
+library(survival); library(rms)
+
+# Cox model
+cox_model <- coxph(Surv(os_years, vital_status) ~
+  age + lymph_nodes + stage + subtype, data = clin)
+
+# Nomogram
+dd <- datadist(clin)
+options(datadist = "dd")
+cox_nomo <- cph(Surv(os_years, vital_status) ~ stage + age,
+  data = clin, surv = TRUE, time.inc = 3)
+nomogram(cox_nomo, fun = function(x) 1 - x,
+  funlabel = "3-Year Survival Probability")
+\end{lstlisting}
+
+\subsection{功能富集分析}
+
+\begin{lstlisting}[caption={g:Profiler功能富集}, label={lst:enrich}]
+library(gprofiler2)
+
+# Enrichment for up-regulated genes
+enrich_result <- gost(
+  query = up_genes,
+  organism = "hsapiens",
+  sources = c("GO:MF", "GO:BP", "GO:CC", "KEGG", "REAC", "WP"),
+  correction_method = "fdr",
+  user_threshold = 0.05)
+\end{lstlisting}
+
+\subsection{突变分析与TMB}
+
+\begin{lstlisting}[caption={maftools突变分析与TMB计算}, label={lst:mut}]
+library(maftools)
+
+maf <- read.maf("brca_mutations.maf")
+
+# Oncoplot
+oncoplot(maf, top = 20)
+
+# TMB calculation (WES ~38 Mb exome)
+tmb <- maf@data %>%
+  group_by(Tumor_Sample_Barcode) %>%
+  summarise(TMB = n() / 38)
+\end{lstlisting}
+
+\subsection{分子亚型分类}
+
+\begin{lstlisting}[caption={LASSO多分类与随机森林}, label={lst:class}]
+library(glmnet); library(randomForest)
+
+# LASSO
+cv_fit <- cv.glmnet(X_train, y_train,
+  family = "multinomial", alpha = 1, nfolds = 5)
+pred <- predict(cv_fit, X_test, s = "lambda.min", type = "class")
+
+# Random Forest
+rf <- randomForest(X_train, y_train, ntree = 500)
+rf_pred <- predict(rf, X_test)
+\end{lstlisting}
+
+\end{document}

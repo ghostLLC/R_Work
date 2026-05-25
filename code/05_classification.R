@@ -159,7 +159,7 @@ if (has_xgboost) {
   dtest  <- xgb.DMatrix(data = X_test, label = y_test_num)
 
   params <- list(
-    objective = "multi:softprob",
+    objective = "multi:softmax",
     num_class = length(levels(y_train)),
     max_depth = 6,
     eta = 0.1,
@@ -171,15 +171,14 @@ if (has_xgboost) {
   xgb_model <- xgb.train(
     params = params,
     data = dtrain,
-    nrounds = 100,
+    nrounds = 500,
     watchlist = list(train = dtrain, test = dtest),
     verbose = 0
   )
 
-  xgb_pred_prob <- predict(xgb_model, dtest)
-  xgb_pred_prob <- matrix(xgb_pred_prob, ncol = length(levels(y_train)), byrow = TRUE)
-  xgb_pred_class <- levels(y_train)[max.col(xgb_pred_prob)]
-  xgb_pred_class <- factor(xgb_pred_class, levels = levels(y_train))
+  # multi:softmax returns class indices directly (0-based); no reshape needed
+  xgb_pred_raw <- predict(xgb_model, dtest)
+  xgb_pred_class <- factor(levels(y_train)[xgb_pred_raw + 1], levels = levels(y_train))
 
   xgb_cm <- confusionMatrix(xgb_pred_class, y_test)
   xgboost_acc <- xgb_cm$overall["Accuracy"]

@@ -1,5 +1,4 @@
-"subtype","n","median","mean","sd"
-"HER2-enriched",35,1.66,2.31,3.05
-"Luminal A",850,0.79,1.67,5.91
-"Luminal B",3,1.11,1.14,0.5
-"Triple Negative",99,1.47,2.72,4.59
+"subtype","n","median_TMB","mean_TMB"
+"Luminal A",850,0.789473684210526,1.67136222910217
+"HER2-enriched",35,1.65789473684211,2.31428571428571
+"Triple Negative",99,1.47368421052632,2.72169059011164

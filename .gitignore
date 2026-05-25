@@ -18,6 +18,12 @@ MANIFEST.txt
 
 # OMC state
 .omc/state/
+code/.omc/
+
+# Temp files
+temp_docx_extract/
+temp_template.zip
+~$*
 
 # OS files
 .DS_Store
